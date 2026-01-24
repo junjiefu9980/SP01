@@ -11,7 +11,7 @@ from sentence_transformers import SentenceTransformer
 
 
 # file
-ROOT_DIR = Path(__file__).resolve().parents[1]
+ROOT_DIR = Path(__file__).resolve().parents[1]  # SP01
 DOC_DIR = str(ROOT_DIR / "data" / "docs")
 OUT_DIR = str(ROOT_DIR / "data" / "index")
 
@@ -161,5 +161,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
