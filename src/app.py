@@ -6,7 +6,6 @@ import numpy as np
 import faiss
 import gradio as gr
 from sentence_transformers import SentenceTransformer
-from sympy import continued_fraction_reduce
 
 # file
 ROOT_DIR = Path(__file__).resolve().parents[1]   # SP01
@@ -43,13 +42,28 @@ def format_sources(hits):
             f"[S{rank} score={score:.4f} | chunk_id={m['chunk_id']} | {m['doc_path']} {page_str}\n"
             f"      {snippet}"
         )
+    return "\n".join(lines)
 
 def answer_from_evidence(hits):
+    if not hits:
+        return "[INFO] No relevant snippets found."
+
+    top_rank, top_score, top_meta = hits[0]
+    top_page = top_meta.get("page")
+    top_page_str = f"(P.{top_page})" if top_page else ""
+    top_snip = top_meta["text"].replace("\n", " ").strip()
+    top_snip = top_snip[:380] + ("..." if len(top_snip) > 380 else "")
+
+    bullets = [f"Most relevant: S{top_rank} ({top_page_str}), score={top_score:.4f}",
+               f"Candidate snippet: {top_snip}",
+               "",
+               "Evidence: "]
+
     # mini answer to list the snippet of evidence, containing number
-    bullets = []
+
     for rank, score, m in hits:
         page = m.get("page")
-        page_str = f"p.{page}" if page else ""
+        page_str = f"(P.{page})" if page else ""
         snippet = m["text"][:380].strip().replace("\n", " ")
         bullets.append(f"- [S{rank}] {page_str} {snippet}")
 

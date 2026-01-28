@@ -9,6 +9,12 @@ import faiss
 import fitz     # PyMuPDF: Reading PDF
 from sentence_transformers import SentenceTransformer
 
+from transformers.utils import logging
+import re
+
+
+logging.set_verbosity_error()
+os.environ["TRANSFORMERS_VERBOSITY"] = "error"  # close the loading... of transformer
 
 # file
 ROOT_DIR = Path(__file__).resolve().parents[1]  # SP01
@@ -23,6 +29,38 @@ CHUNK_SIZE = 900
 CHUNK_OVERLAP = 180
 
 
+def clean_pdf_text(txt: str) -> str:
+    # eliminate "...No." in contents
+    lines = []
+    toc_like = 0
+    raw_lines = txt.splitlines()
+
+    for line in raw_lines:
+        s = line.strip()
+        if not s:
+            continue
+
+        # contents "...", "Page"
+        if re.search(r"\.{5,}\s*\d+\s*$", s):
+            toc_like += 1
+            continue
+
+        # pure dot
+        dot_ratio = s.count(".") / max(1, len(s))
+        if dot_ratio > 0.3 and len(s) > 20:
+            continue
+
+        lines.append(s)
+
+    # eliminate content page
+    if raw_lines and toc_like >= max(8, int(0.3 * len([x for x in raw_lines if x.strip()]))):
+        return ""
+
+    # eliminate blanket
+    cleaned = "\n".join(lines)
+    cleaned = re.sub(r"[ \t]+", " ", cleaned)
+    return cleaned.strip()
+
 def extract_pdf_pages(pdf_path: str) -> List[Tuple[int, str]]:
     # extract pdf text as pages, and return
     doc = fitz.open(pdf_path)       # PyMuPDF
@@ -30,6 +68,7 @@ def extract_pdf_pages(pdf_path: str) -> List[Tuple[int, str]]:
     for i in range(len(doc)):
         txt = doc[i].get_text("text") or ""     # avoid None
         txt = txt.replace("\x00", "").strip()   # avoid blank and line break
+        txt = clean_pdf_text(txt)
         if txt:
             pages.append((i+1, txt))
     return pages
@@ -76,7 +115,7 @@ def main():
 
     # 1. collect document files by recursion and only keep PDF, txt, docx
     files = sorted(glob.glob(os.path.join(DOC_DIR, "**/*.*"), recursive = True))
-    files = [p for p in files if p.lower().endswith((".pdf", ".txt", ".docx", ".md"))]
+    files = [p for p in files if p.lower().endswith((".pdf", ".txt", ".md"))]
 
     if not files:
         raise RuntimeError(f"No pdf/txt/docx files found in {DOC_DIR}")
